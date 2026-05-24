@@ -49,6 +49,10 @@ export interface Translations {
     download: string;
     hint: string;
   };
+  settings: {
+    theme: string;
+    language: string;
+  };
 }
 
 export const en: Translations = {
@@ -100,6 +104,10 @@ export const en: Translations = {
     download: "Download",
     hint: "models stored locally, work offline",
   },
+  settings: {
+    theme: "Theme",
+    language: "Language",
+  },
 };
 
 export const ru: Translations = {
@@ -150,6 +158,10 @@ export const ru: Translations = {
     retry: "Повторить",
     download: "Скачать",
     hint: "модели хранятся локально и работают офлайн",
+  },
+  settings: {
+    theme: "Тема",
+    language: "Язык",
   },
 };
 

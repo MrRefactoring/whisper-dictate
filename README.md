@@ -27,8 +27,6 @@ The app will notify you about updates on startup.
 |---|---|
 | ![Light theme](docs/screenshot-light.png) | ![Dark theme](docs/screenshot-dark.png) |
 
-> Screenshots coming soon. To contribute, run the app and drop images in `docs/`.
-
 ## Build from source
 
 ### macOS

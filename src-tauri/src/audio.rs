@@ -14,6 +14,17 @@ pub const TARGET_SAMPLE_RATE: u32 = 16_000;
 
 pub type SharedBuffer = Arc<Mutex<Vec<f32>>>;
 
+/// Triggers the macOS microphone permission dialog on first run by briefly
+/// opening an audio input stream. Must be called from its own thread because
+/// `cpal::Stream` is `!Send` and must be created + dropped on the same thread.
+/// On subsequent runs (permission already granted/denied) this is a no-op.
+#[cfg(target_os = "macos")]
+pub fn request_permission_warmup() {
+    let buf: SharedBuffer = Arc::new(Mutex::new(Vec::new()));
+    let _ = start_capture(buf);
+    // AudioCapture (and its Stream) drop here, releasing the mic.
+}
+
 /// Active capture stream. Dropping stops the microphone.
 pub struct AudioCapture {
     _stream: Stream,

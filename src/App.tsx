@@ -4,7 +4,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { MicButton } from "./components/MicButton";
 import { ModelPicker } from "./components/ModelPicker";
 import { TranscriptPanel } from "./components/TranscriptPanel";
-import { LangSwitch } from "./components/LangSwitch";
+import { SettingsMenu } from "./components/SettingsMenu";
 import { Toast } from "./components/Toast";
 import { useDictation } from "./hooks/useDictation";
 import { useUpdater } from "./hooks/useUpdater";
@@ -86,7 +86,7 @@ function App() {
       <header className="app__head">
         <h1 className="brand">ma</h1>
         <div className="app__head-right">
-          <LangSwitch />
+          <SettingsMenu />
           <ModelPicker
             models={d.models}
             current={d.currentModel}
