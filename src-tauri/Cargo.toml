@@ -39,7 +39,7 @@ symphonia = { version = "0.5", features = ["all"] }
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16.0", features = ["metal"] }
 
-# Windows / Linux: Vulkan GPU (preferred); runtime fallback to CPU if no Vulkan-capable GPU
+# Windows / Linux: CPU inference (Vulkan shader compilation is broken in CI on Windows)
 [target.'cfg(not(target_os = "macos"))'.dependencies]
-whisper-rs = { version = "0.16.0", features = ["vulkan"] }
+whisper-rs = { version = "0.16.0" }
 
