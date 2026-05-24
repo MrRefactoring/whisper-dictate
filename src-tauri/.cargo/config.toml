@@ -1,0 +1,17 @@
+# Линковка для сборки whisper-rs (whisper.cpp) на Apple Silicon.
+# Accelerate — BLAS-ускорение, libc++ — рантайм C++. Без этих флагов сборка
+# whisper.cpp на aarch64-apple-darwin падает на этапе линковки.
+[target.aarch64-apple-darwin]
+rustflags = "-lc++ -l framework=Accelerate"
+
+[target.x86_64-apple-darwin]
+rustflags = "-lc++ -l framework=Accelerate"
+
+# whisper.cpp (ggml) использует std::filesystem, доступный с macOS 10.15.
+# Фиксируем deployment target, иначе release-сборка (tauri build по умолчанию
+# целит 10.13) падает на 'path is unavailable: introduced in macOS 10.15'.
+# force = true обязателен: tauri build уже экспортирует MACOSX_DEPLOYMENT_TARGET,
+# и без force cargo не перекрывает унаследованное значение.
+# На Windows и Linux эта переменная игнорируется компилятором — безвредна.
+[env]
+MACOSX_DEPLOYMENT_TARGET = { value = "11.0", force = true }

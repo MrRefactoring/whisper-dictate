@@ -1,0 +1,45 @@
+[package]
+name = "whisper-dictate"
+version = "0.1.0"
+description = "Локальная диктовка на Whisper (Metal на macOS, Vulkan GPU на Windows)"
+authors = ["Vladislav Tupikin"]
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[lib]
+# The `_lib` suffix may seem redundant but it is necessary
+# to make the lib name unique and wouldn't conflict with the bin name.
+# This seems to be only an issue on Windows, see https://github.com/rust-lang/cargo/issues/8519
+name = "whisper_dictate_lib"
+crate-type = ["staticlib", "cdylib", "rlib"]
+
+[build-dependencies]
+tauri-build = { version = "2", features = [] }
+
+[dependencies]
+tauri = { version = "2", features = [] }
+tauri-plugin-opener = "2"
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+cpal = "0.17.3"
+tauri-plugin-clipboard-manager = "2.3.2"
+tauri-plugin-global-shortcut = "2.3.1"
+anyhow = "1.0.102"
+thiserror = "2.0.18"
+parking_lot = "0.12.5"
+crossbeam-channel = "0.5.15"
+reqwest = { version = "0.13.3", features = ["blocking"] }
+tauri-plugin-dialog = "2.7.1"
+tauri-plugin-updater = "2"
+tauri-plugin-process = "2"
+symphonia = { version = "0.5", features = ["all"] }
+
+# macOS: Metal GPU acceleration
+[target.'cfg(target_os = "macos")'.dependencies]
+whisper-rs = { version = "0.16.0", features = ["metal"] }
+
+# Windows / Linux: Vulkan GPU (preferred); runtime fallback to CPU if no Vulkan-capable GPU
+[target.'cfg(not(target_os = "macos"))'.dependencies]
+whisper-rs = { version = "0.16.0", features = ["vulkan"] }
+

@@ -1,0 +1,65 @@
+{
+  "$schema": "https://schema.tauri.app/config/2",
+  "productName": "Whisper Dictate",
+  "version": "0.1.0",
+  "identifier": "com.vladislav.whisperdictate",
+  "build": {
+    "beforeDevCommand": "pnpm dev",
+    "devUrl": "http://localhost:1420",
+    "beforeBuildCommand": "pnpm build",
+    "frontendDist": "../dist"
+  },
+  "app": {
+    "windows": [
+      {
+        "title": "Whisper Dictate",
+        "width": 460,
+        "height": 720,
+        "minWidth": 380,
+        "minHeight": 560,
+        "resizable": true,
+        "fullscreen": false
+      }
+    ],
+    "security": {
+      "csp": null
+    }
+  },
+  "bundle": {
+    "active": true,
+    "targets": "all",
+    "createUpdaterArtifacts": true,
+    "category": "Productivity",
+    "copyright": "© 2026 Vladislav Tupikin",
+    "shortDescription": "Local speech-to-text via Whisper",
+    "longDescription": "Whisper Dictate — fully local speech recognition via Whisper, no audio leaves the device. Transcript can be edited and copied.",
+    "macOS": {
+      "minimumSystemVersion": "11.0"
+    },
+    "windows": {
+      "digestAlgorithm": "sha256",
+      "timestampUrl": "",
+      "webviewInstallMode": {
+        "type": "downloadBootstrapper"
+      }
+    },
+    "icon": [
+      "icons/32x32.png",
+      "icons/128x128.png",
+      "icons/128x128@2x.png",
+      "icons/icon.icns",
+      "icons/icon.ico"
+    ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDAxNTk0MTk3MEY1OENDOUYKUldTZnpGZ1BsMEZaQVRkcStVVlhpUXllTFhUd0xHc2RJSU5rMVdqSUVkNFZyb0kwQXdjZHNPTVkK",
+      "endpoints": [
+        "https://github.com/MrRefactoring/whisper-dictate/releases/latest/download/latest.json"
+      ],
+      "windows": {
+        "installMode": "passive"
+      }
+    }
+  }
+}
