@@ -93,9 +93,11 @@ jobs:
           RELEASE_ID: ${{ needs.create-release.outputs.release-id }}
         with:
           script: |
+            const tag = context.ref.replace('refs/tags/', '')
             await github.rest.repos.updateRelease({
               owner: context.repo.owner,
               repo: context.repo.repo,
               release_id: parseInt(process.env.RELEASE_ID),
+              tag_name: tag,
               draft: false
             })
