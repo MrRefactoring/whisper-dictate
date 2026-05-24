@@ -35,12 +35,12 @@ pub fn find_loop_point(samples: &[f32]) -> Option<usize> {
             max_sim = sim;
         }
         if sim >= THRESHOLD {
-            eprintln!("[loop_detect] loop at {:.1} s (sim={:.4})", pos as f32 / 16_000.0, sim);
+            log::info!(target: "loop_detect", "loop at {:.1} s (sim={:.4})", pos as f32 / 16_000.0, sim);
             return Some(pos);
         }
         pos += STEP;
     }
-    eprintln!("[loop_detect] no loop found, max_sim={:.4}", max_sim);
+    log::info!(target: "loop_detect", "no loop found, max_sim={max_sim:.4}");
     None
 }
 

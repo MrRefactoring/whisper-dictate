@@ -103,12 +103,12 @@ fn worker(
             } else {
                 "CPU"
             };
-            eprintln!("[engine] model loaded: {:?} ({})", current_model, backend);
+            log::info!(target: "engine", "model loaded: {current_model:?} ({backend})");
             transcriber = Some(t);
             set_status(&app, &status, current_model, true, None);
         }
         Err(e) => {
-            eprintln!("[engine] failed to load model: {e}");
+            log::error!(target: "engine", "failed to load model: {e}");
             set_status(&app, &status, current_model, false, Some(e.to_string()));
         }
     }
@@ -124,9 +124,9 @@ fn worker(
         match rx.recv_timeout(timeout) {
             Ok(EngineCommand::Start) => {
                 if recording {
-                    eprintln!("[engine] Start received while already recording — ignored");
+                    log::warn!(target: "engine", "Start received while already recording — ignored");
                 } else {
-                    eprintln!("[engine] Start");
+                    log::info!(target: "engine", "Start");
                     buffer.lock().clear();
                     match audio::start_capture(buffer.clone()) {
                         Ok(c) => {
@@ -136,7 +136,7 @@ fn worker(
                             emit_state(&app, RecordingState::Recording);
                         }
                         Err(e) => {
-                            eprintln!("[engine] start_capture error: {e}");
+                            log::error!(target: "engine", "start_capture error: {e}");
                             emit_error(&app, format!("microphone: {e}"));
                         }
                     }
@@ -179,7 +179,7 @@ fn worker(
                         } else {
                             "CPU"
                         };
-                        eprintln!("[engine] model switched: {:?} ({})", current_model, backend);
+                        log::info!(target: "engine", "model switched: {current_model:?} ({backend})");
                         transcriber = Some(t);
                         set_status(&app, &status, current_model, true, None);
                     }
@@ -295,7 +295,7 @@ fn transcribe_file(
 
     // Trim at the loop point if one was detected.
     if let Some(loop_pt) = loop_detect::find_loop_point(&pcm) {
-        eprintln!("[engine] loop at {:.1} s, trimming", loop_pt as f32 / 16_000.0);
+        log::info!(target: "engine", "loop at {:.1} s, trimming", loop_pt as f32 / 16_000.0);
         pcm.truncate(loop_pt);
     }
 

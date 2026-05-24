@@ -2,7 +2,15 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { invoke } from "@tauri-apps/api/core";
 import { listen, type UnlistenFn } from "@tauri-apps/api/event";
 import { writeText } from "@tauri-apps/plugin-clipboard-manager";
+import { info as logInfo, attachConsole } from "@tauri-apps/plugin-log";
 import { useI18n } from "../i18n";
+
+// Monotonic counter for recording-control invocations — lets the log reveal
+// duplicate/suppressed start_recording calls while diagnosing the mic bug.
+let invokeSeq = 0;
+const feLog = (msg: string) => {
+  logInfo(`[fe] #${++invokeSeq} ${msg}`).catch(() => {});
+};
 import {
   EVENTS,
   type DownloadCancelled,
@@ -71,7 +79,16 @@ export function useDictation(): DictationState & DictationActions {
 
   useEffect(() => {
     let unlisteners: UnlistenFn[] = [];
+    let detachConsole: UnlistenFn | undefined;
     let cancelled = false;
+
+    // Mirror webview console.* into the same log file as the Rust backend.
+    attachConsole()
+      .then((d) => {
+        if (cancelled) d();
+        else detachConsole = d;
+      })
+      .catch(() => {});
 
     (async () => {
       const subs = await Promise.all([
@@ -169,6 +186,7 @@ export function useDictation(): DictationState & DictationActions {
     return () => {
       cancelled = true;
       unlisteners.forEach((u) => u());
+      detachConsole?.();
       if (fileAnimRef.current !== null) clearInterval(fileAnimRef.current);
       if (fileDoneTimerRef.current !== null) clearTimeout(fileDoneTimerRef.current);
     };
@@ -185,22 +203,29 @@ export function useDictation(): DictationState & DictationActions {
   }, []);
 
   const start = useCallback(() => {
-    if (activeRef.current) return;
+    if (activeRef.current) {
+      feLog("start_recording SUPPRESSED (already active)");
+      return;
+    }
     activeRef.current = true;
+    feLog("start_recording → invoke");
     invoke("start_recording").catch((e) => setError(String(e)));
   }, []);
 
   const stop = useCallback(() => {
     activeRef.current = false;
+    feLog("stop_recording → invoke");
     invoke("stop_recording").catch((e) => setError(String(e)));
   }, []);
 
   const setLocked = useCallback((locked: boolean) => {
+    feLog(`set_locked(${locked}) → invoke`);
     invoke("set_locked", { locked }).catch((e) => setError(String(e)));
   }, []);
 
   const cancel = useCallback(() => {
     activeRef.current = false;
+    feLog("cancel_recording → invoke");
     invoke("cancel_recording").catch((e) => setError(String(e)));
   }, []);
 

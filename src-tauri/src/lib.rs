@@ -9,6 +9,7 @@
 pub mod audio;
 mod commands;
 pub mod decode;
+mod diag;
 mod engine;
 pub mod loop_detect;
 pub mod model_manager;
@@ -20,6 +21,10 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Redirect native stderr (C++/ggml output, Rust panics) into a log file FIRST,
+    // before anything writes to stderr. Captures output even when launched from Finder.
+    diag::redirect_native_stderr();
+
     // Workaround for a crash in ggml-metal on Apple Silicon (whisper-rs 0.16.0).
     // MTLResidencySet objects have a 180 s keep-alive; if the process exits before
     // that window the Metal device destructor asserts [rsets->data count] == 0.
@@ -32,6 +37,12 @@ pub fn run() {
     unsafe { std::env::set_var("GGML_METAL_NO_RESIDENCY", "1"); }
 
     tauri::Builder::default()
+        .plugin(
+            tauri_plugin_log::Builder::new()
+                .targets(diag::log_targets())
+                .level(log::LevelFilter::Debug)
+                .build(),
+        )
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
         .plugin(tauri_plugin_dialog::init())
@@ -39,6 +50,7 @@ pub fn run() {
         .plugin(tauri_plugin_updater::Builder::new().build())
         .plugin(tauri_plugin_process::init())
         .setup(|app| {
+            diag::startup_diagnostics(app.handle());
             let handle = app.handle().clone();
             let status = engine::ModelStatusShared::default();
             app.manage(status.clone());

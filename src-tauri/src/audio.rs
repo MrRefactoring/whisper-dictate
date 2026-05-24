@@ -14,6 +14,25 @@ pub const TARGET_SAMPLE_RATE: u32 = 16_000;
 
 pub type SharedBuffer = Arc<Mutex<Vec<f32>>>;
 
+/// Raw `AVCaptureDevice.authorizationStatusForMediaType:` for audio.
+/// Returns the AVAuthorizationStatus: 0=NotDetermined, 1=Restricted,
+/// 2=Denied, 3=Authorized. Returns 3 (assume ok) if AVFoundation is missing.
+#[cfg(target_os = "macos")]
+pub(crate) fn mic_tcc_status() -> isize {
+    use objc2::msg_send;
+    use objc2::runtime::AnyClass;
+    use objc2_foundation::ns_string;
+
+    unsafe {
+        let Some(cls) = AnyClass::get(c"AVCaptureDevice") else {
+            log::warn!(target: "audio", "AVCaptureDevice not found, assuming authorized");
+            return 3;
+        };
+        let audio_type = ns_string!("soun"); // AVMediaTypeAudio
+        msg_send![cls, authorizationStatusForMediaType: audio_type]
+    }
+}
+
 /// Returns an error if the user has explicitly denied microphone access via TCC.
 ///
 /// For `NotDetermined` and `Authorized` we return `Ok(())` — cpal / CoreAudio
@@ -24,26 +43,43 @@ pub type SharedBuffer = Arc<Mutex<Vec<f32>>>;
 /// racing each other, which is why permission was being asked 6 times.
 #[cfg(target_os = "macos")]
 fn check_mic_not_denied() -> Result<()> {
-    use objc2::msg_send;
-    use objc2::runtime::AnyClass;
-    use objc2_foundation::ns_string;
-
-    unsafe {
-        let Some(cls) = AnyClass::get(c"AVCaptureDevice") else {
-            eprintln!("[audio] AVCaptureDevice not found, skipping TCC pre-check");
-            return Ok(());
-        };
-        let audio_type = ns_string!("soun"); // AVMediaTypeAudio
-        // AVAuthorizationStatus: 0=NotDetermined, 1=Restricted, 2=Denied, 3=Authorized
-        let status: isize = msg_send![cls, authorizationStatusForMediaType: audio_type];
-        eprintln!("[audio] TCC mic status = {status} (0=unknown,1=restricted,2=denied,3=ok)");
-        match status {
-            1 | 2 => Err(anyhow!(
-                "microphone access denied — open System Settings → Privacy & Security → Microphone"
-            )),
-            _ => Ok(()),
-        }
+    let status = mic_tcc_status();
+    log::info!(target: "audio", "TCC mic status = {status} (0=unknown,1=restricted,2=denied,3=ok)");
+    match status {
+        1 | 2 => Err(anyhow!(
+            "microphone access denied — open System Settings → Privacy & Security → Microphone"
+        )),
+        _ => Ok(()),
     }
+}
+
+/// Enumerates available input devices with their default config, for diagnostics.
+pub fn enumerate_input_devices() -> Vec<String> {
+    let host = cpal::default_host();
+    let default_name = host
+        .default_input_device()
+        .and_then(|d| d.name().ok())
+        .unwrap_or_default();
+
+    let mut out = Vec::new();
+    match host.input_devices() {
+        Ok(devices) => {
+            for d in devices {
+                let name = d.name().unwrap_or_else(|_| "<unknown>".into());
+                let cfg = d
+                    .default_input_config()
+                    .map(|c| format!("{c:?}"))
+                    .unwrap_or_else(|e| format!("config error: {e}"));
+                let marker = if name == default_name { " [default]" } else { "" };
+                out.push(format!("{name}{marker} — {cfg}"));
+            }
+        }
+        Err(e) => out.push(format!("input_devices() error: {e}")),
+    }
+    if out.is_empty() {
+        out.push("<no input devices>".into());
+    }
+    out
 }
 
 /// Active capture stream. Dropping stops the microphone.
@@ -54,7 +90,7 @@ pub struct AudioCapture {
 }
 
 pub fn start_capture(buffer: SharedBuffer) -> Result<AudioCapture> {
-    eprintln!("[audio] start_capture called");
+    log::info!(target: "audio", "start_capture called");
 
     // On macOS: bail early if permission was explicitly denied so the user gets
     // a human-readable error instead of a cryptic CoreAudio code.
@@ -68,15 +104,15 @@ pub fn start_capture(buffer: SharedBuffer) -> Result<AudioCapture> {
         .default_input_device()
         .ok_or_else(|| anyhow!("no default input device found"))?;
 
-    eprintln!("[audio] input device: {}", device.name().unwrap_or_default());
+    log::info!(target: "audio", "input device: {}", device.name().unwrap_or_default());
 
     let supported = device.default_input_config()?;
-    eprintln!("[audio] config: {:?}", supported);
+    log::info!(target: "audio", "config: {supported:?}");
     let sample_rate = supported.sample_rate();
     let channels = supported.channels() as usize;
     let config: cpal::StreamConfig = supported.config();
 
-    let err_fn = |e| eprintln!("[audio] stream error: {e}");
+    let err_fn = |e| log::error!(target: "audio", "stream error: {e}");
 
     let stream = match supported.sample_format() {
         cpal::SampleFormat::F32 => build_stream::<f32>(&device, &config, channels, buffer, err_fn)?,
@@ -85,9 +121,9 @@ pub fn start_capture(buffer: SharedBuffer) -> Result<AudioCapture> {
         other => return Err(anyhow!("unsupported sample format: {other:?}")),
     };
 
-    eprintln!("[audio] stream built, calling play()");
+    log::info!(target: "audio", "stream built, calling play()");
     stream.play()?;
-    eprintln!("[audio] stream playing");
+    log::info!(target: "audio", "stream playing");
     Ok(AudioCapture {
         _stream: stream,
         sample_rate,
