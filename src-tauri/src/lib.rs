@@ -20,6 +20,17 @@ use tauri::Manager;
 
 #[cfg_attr(mobile, tauri::mobile_entry_point)]
 pub fn run() {
+    // Workaround for a crash in ggml-metal on Apple Silicon (whisper-rs 0.16.0).
+    // MTLResidencySet objects have a 180 s keep-alive; if the process exits before
+    // that window the Metal device destructor asserts [rsets->data count] == 0.
+    // Setting GGML_METAL_NO_RESIDENCY=1 tells ggml to skip residency sets entirely
+    // (GPU memory becomes evictable after ~1 s of inactivity — negligible for STT).
+    // Must be set before ggml initialises the Metal device (i.e. before model load).
+    // See: https://github.com/ggml-org/llama.cpp/pull/11427
+    #[cfg(target_os = "macos")]
+    // SAFETY: single-threaded at this point; no other threads have started yet.
+    unsafe { std::env::set_var("GGML_METAL_NO_RESIDENCY", "1"); }
+
     tauri::Builder::default()
         .plugin(tauri_plugin_opener::init())
         .plugin(tauri_plugin_clipboard_manager::init())
