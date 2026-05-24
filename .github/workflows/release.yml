@@ -83,6 +83,9 @@ jobs:
           echo "VULKAN_SDK=$($sdk.FullName)" >> $env:GITHUB_ENV
           echo "$($sdk.FullName)\Bin" >> $env:GITHUB_PATH
           echo "CMAKE_GENERATOR=Ninja" >> $env:GITHUB_ENV
+          # /FS forces synchronous PDB writes so parallel cl.exe don't conflict
+          echo "CFLAGS=/FS" >> $env:GITHUB_ENV
+          echo "CXXFLAGS=/FS" >> $env:GITHUB_ENV
 
       # ilammy/msvc-dev-cmd puts cl.exe / link.exe in PATH so Ninja can find the MSVC toolchain
       - name: Set up MSVC dev environment (Windows)

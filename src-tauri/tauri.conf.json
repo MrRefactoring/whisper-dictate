@@ -53,7 +53,7 @@
   },
   "plugins": {
     "updater": {
-      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IDAxNTk0MTk3MEY1OENDOUYKUldTZnpGZ1BsMEZaQVRkcStVVlhpUXllTFhUd0xHc2RJSU5rMVdqSUVkNFZyb0kwQXdjZHNPTVkK",
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IEMwQjU1NDA2N0E3RTlGMzkKUldRNW4zNTZCbFMxd0JpQkpwd3E3bUJob2dpVGlCRklpTUhaTW4xWmhaZlQrZ3cvL2tuOGlneGMK",
       "endpoints": [
         "https://github.com/MrRefactoring/whisper-dictate/releases/latest/download/latest.json"
       ],
