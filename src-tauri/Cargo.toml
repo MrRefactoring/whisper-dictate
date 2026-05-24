@@ -35,9 +35,12 @@ tauri-plugin-updater = "2"
 tauri-plugin-process = "2"
 symphonia = { version = "0.5", features = ["all"] }
 
-# macOS: Metal GPU acceleration
+# macOS: Metal GPU acceleration + ObjC bindings for microphone permission dialog
 [target.'cfg(target_os = "macos")'.dependencies]
 whisper-rs = { version = "0.16.0", features = ["metal"] }
+block2 = "0.6"
+objc2 = "0.6"
+objc2-foundation = { version = "0.3", default-features = false, features = ["NSString"] }
 
 # Windows / Linux: CPU inference (Vulkan shader compilation is broken in CI on Windows)
 [target.'cfg(not(target_os = "macos"))'.dependencies]

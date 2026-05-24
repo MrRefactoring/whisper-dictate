@@ -31,7 +31,7 @@ pub fn run() {
             // On macOS, request microphone permission immediately on startup so the
             // system dialog never interrupts the user mid-gesture on the mic button.
             #[cfg(target_os = "macos")]
-            std::thread::spawn(crate::audio::request_permission_warmup);
+            std::thread::spawn(crate::audio::request_microphone_permission);
 
             let handle = app.handle().clone();
             let status = engine::ModelStatusShared::default();

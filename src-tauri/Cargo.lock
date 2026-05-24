@@ -5731,8 +5731,11 @@ name = "whisper-dictate"
 version = "0.2.0"
 dependencies = [
  "anyhow",
+ "block2",
  "cpal",
  "crossbeam-channel",
+ "objc2",
+ "objc2-foundation",
  "parking_lot",
  "reqwest",
  "serde",

@@ -14,15 +14,40 @@ pub const TARGET_SAMPLE_RATE: u32 = 16_000;
 
 pub type SharedBuffer = Arc<Mutex<Vec<f32>>>;
 
-/// Triggers the macOS microphone permission dialog on first run by briefly
-/// opening an audio input stream. Must be called from its own thread because
-/// `cpal::Stream` is `!Send` and must be created + dropped on the same thread.
-/// On subsequent runs (permission already granted/denied) this is a no-op.
+/// Requests macOS microphone permission via AVCaptureDevice.requestAccess.
+/// Blocks the calling thread until the user responds (or returns immediately
+/// if permission was already granted or denied). This must be called before
+/// any cpal audio capture so the system dialog never interrupts a recording
+/// gesture and eats the pointer-up event.
 #[cfg(target_os = "macos")]
-pub fn request_permission_warmup() {
-    let buf: SharedBuffer = Arc::new(Mutex::new(Vec::new()));
-    let _ = start_capture(buf);
-    // AudioCapture (and its Stream) drop here, releasing the mic.
+pub fn request_microphone_permission() {
+    use block2::RcBlock;
+    use objc2::msg_send;
+    use objc2::runtime::AnyClass;
+    use objc2_foundation::ns_string;
+    use std::sync::mpsc;
+
+    unsafe {
+        let Some(cls) = AnyClass::get(c"AVCaptureDevice") else { return };
+        // "soun" is the raw value of AVMediaTypeAudio
+        let audio_type = ns_string!("soun");
+
+        // 0 = AVAuthorizationStatusNotDetermined; any other value means already decided
+        let status: isize = msg_send![cls, authorizationStatusForMediaType: audio_type];
+        if status != 0 {
+            return;
+        }
+
+        let (tx, rx) = mpsc::channel::<()>();
+        // Block argument must be `runtime::Bool`, not `bool` — objc2 Encode requires it
+        let block: RcBlock<dyn Fn(objc2::runtime::Bool)> =
+            RcBlock::new(move |_granted: objc2::runtime::Bool| {
+                let _ = tx.send(());
+            });
+        let _: () =
+            msg_send![cls, requestAccessForMediaType: audio_type, completionHandler: &*block];
+        let _ = rx.recv(); // block until user responds
+    }
 }
 
 /// Active capture stream. Dropping stops the microphone.

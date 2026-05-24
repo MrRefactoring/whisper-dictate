@@ -109,6 +109,7 @@ export function MicButton({ state, level, disabled, onStart, onStop, onLock }: M
         onPointerMove={onPointerMove}
         onPointerUp={end}
         onPointerLeave={end}
+        onPointerCancel={end}
         onContextMenu={(e) => e.preventDefault()}
         aria-label={active ? t.mic.ariaActive : t.mic.ariaIdle}
       >
