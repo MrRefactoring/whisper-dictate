@@ -1,6 +1,6 @@
-//! Headless-проверка пайплайна расшифровки файла (декод + whisper) без GUI.
-//! Запуск: cargo run --example try_transcribe -- /path/to/file.mp4
-//! Вся работа идёт на ОТДЕЛЬНОМ потоке — как в движке приложения (engine worker).
+//! Headless check of the file transcription pipeline (decode + whisper) without a GUI.
+//! Run: cargo run --example try_transcribe -- /path/to/file.mp4
+//! All work runs on a SEPARATE thread — same as in the app's engine worker.
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -15,22 +15,22 @@ fn main() {
         std::env::var("HOME").unwrap()
     );
 
-    // Имитируем движок: загрузка модели и транскрипция на спавненном потоке.
+    // Simulate the engine: load model and transcribe on a spawned thread.
     let handle = std::thread::spawn(move || {
-        eprintln!("[worker] декодирую {path}…");
+        eprintln!("[worker] decoding {path}…");
         let cancel = AtomicBool::new(false);
         let pcm = decode::decode_to_16k_mono(&PathBuf::from(&path), &cancel).expect("decode failed");
-        eprintln!("[worker] декод ок: {:.1} c", pcm.len() as f32 / 16000.0);
+        eprintln!("[worker] decode ok: {:.1} s", pcm.len() as f32 / 16000.0);
 
-        eprintln!("[worker] загружаю модель…");
+        eprintln!("[worker] loading model…");
         let t = Transcriber::load(std::path::Path::new(&model), ModelId::LargeV3Turbo)
             .expect("load failed");
 
-        eprintln!("[worker] транскрибирую…");
-        t.transcribe_with(&pcm, |p| eprintln!("[worker] прогресс {p}%"), || false)
+        eprintln!("[worker] transcribing…");
+        t.transcribe_with(&pcm, |p| eprintln!("[worker] progress {p}%"), || false)
             .expect("transcribe failed")
     });
 
     let text = handle.join().expect("worker panicked");
-    println!("\n===== РЕЗУЛЬТАТ =====\n{text}\n=====================");
+    println!("\n===== RESULT =====\n{text}\n==================");
 }

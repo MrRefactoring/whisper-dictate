@@ -86,7 +86,12 @@ function App() {
       <header className="app__head">
         <h1 className="brand">ma</h1>
         <div className="app__head-right">
-          <SettingsMenu />
+          <SettingsMenu
+            checking={upd.checking}
+            upToDate={upd.upToDate}
+            updateAvailable={upd.available}
+            checkNow={upd.checkNow}
+          />
           <ModelPicker
             models={d.models}
             current={d.currentModel}

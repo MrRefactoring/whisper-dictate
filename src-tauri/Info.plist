@@ -2,9 +2,8 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-  <!-- Текст системного запроса доступа к микрофону (TCC). Единственное
-       чувствительное разрешение, которое нужно приложению. -->
+  <!-- Microphone access description shown by macOS TCC permission dialog. -->
   <key>NSMicrophoneUsageDescription</key>
-  <string>Whisper Dictate использует микрофон, чтобы локально на устройстве распознавать вашу речь.</string>
+  <string>Whisper Dictate uses the microphone to transcribe your speech entirely on-device.</string>
 </dict>
 </plist>

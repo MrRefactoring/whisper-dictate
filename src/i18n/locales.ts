@@ -52,6 +52,9 @@ export interface Translations {
   settings: {
     theme: string;
     language: string;
+    checkUpdates: string;
+    checking: string;
+    upToDate: string;
   };
 }
 
@@ -107,6 +110,9 @@ export const en: Translations = {
   settings: {
     theme: "Theme",
     language: "Language",
+    checkUpdates: "Check for updates",
+    checking: "Checking…",
+    upToDate: "Up to date ✓",
   },
 };
 
@@ -162,6 +168,9 @@ export const ru: Translations = {
   settings: {
     theme: "Тема",
     language: "Язык",
+    checkUpdates: "Проверить обновления",
+    checking: "Проверяю…",
+    upToDate: "Обновлений нет ✓",
   },
 };
 

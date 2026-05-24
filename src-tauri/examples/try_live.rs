@@ -1,6 +1,6 @@
-//! Headless-репро пути ЖИВОЙ диктовки: повторные transcribe() на растущем
-//! буфере (как interim каждые 900 мс), затем финальный прогон.
-//! Запуск: cargo run --example try_live -- /path/to/file.mp4
+//! Headless repro of the LIVE dictation path: repeated transcribe() on a growing
+//! buffer (like interim every 900 ms), then a final pass.
+//! Run: cargo run --example try_live -- /path/to/file.mp4
 
 use std::path::PathBuf;
 use std::sync::atomic::AtomicBool;
@@ -18,35 +18,35 @@ fn main() {
     let handle = std::thread::spawn(move || {
         let cancel = AtomicBool::new(false);
         let pcm = decode::decode_to_16k_mono(&PathBuf::from(&path), &cancel).expect("decode failed");
-        eprintln!("[worker] декод ок: {:.1} c", pcm.len() as f32 / 16000.0);
+        eprintln!("[worker] decode ok: {:.1} s", pcm.len() as f32 / 16000.0);
 
         let t = Transcriber::load(std::path::Path::new(&model), ModelId::LargeV3Turbo)
             .expect("load failed");
-        eprintln!("[worker] модель загружена");
+        eprintln!("[worker] model loaded");
 
-        // Имитируем interim: растущие окна по ~1 c, как при удержании кнопки.
-        let step = 16_000; // 1 c при 16 kHz
-        let cap = pcm.len().min(15 * 16_000); // как реальное удержание ~15 c
+        // Simulate interim: growing windows of ~1 s, as during button hold.
+        let step = 16_000; // 1 s at 16 kHz
+        let cap = pcm.len().min(15 * 16_000); // like a real ~15 s hold
         let mut end = step;
         let mut call = 0;
         while end < cap {
             call += 1;
             let chunk = &pcm[..end];
             match t.transcribe(chunk) {
-                Ok(txt) => eprintln!("[worker] interim #{call} ({} c) ок: {} симв", end / 16_000, txt.chars().count()),
+                Ok(txt) => eprintln!("[worker] interim #{call} ({} s) ok: {} chars", end / 16_000, txt.chars().count()),
                 Err(e) => {
-                    eprintln!("[worker] interim #{call} ({} c) ОШИБКА: {e:#}", end / 16_000);
+                    eprintln!("[worker] interim #{call} ({} s) ERROR: {e:#}", end / 16_000);
                     panic!("interim failed on call {call}");
                 }
             }
             end += step;
         }
 
-        // Финальный прогон по всему буферу.
+        // Final pass over the full buffer.
         match t.transcribe(&pcm) {
-            Ok(txt) => eprintln!("[worker] FINAL ок: {} симв", txt.chars().count()),
+            Ok(txt) => eprintln!("[worker] FINAL ok: {} chars", txt.chars().count()),
             Err(e) => {
-                eprintln!("[worker] FINAL ОШИБКА: {e:#}");
+                eprintln!("[worker] FINAL ERROR: {e:#}");
                 panic!("final failed");
             }
         }

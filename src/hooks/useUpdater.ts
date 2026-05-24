@@ -7,11 +7,14 @@ export interface UpdaterState {
   version: string | null;
   installing: boolean;
   error: string | null;
+  checking: boolean;
+  upToDate: boolean;
 }
 
 export interface UpdaterActions {
   install: () => Promise<void>;
   dismiss: () => void;
+  checkNow: () => Promise<void>;
 }
 
 export function useUpdater(): UpdaterState & UpdaterActions {
@@ -20,6 +23,8 @@ export function useUpdater(): UpdaterState & UpdaterActions {
   const [installing, setInstalling] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [update, setUpdate] = useState<Update | null>(null);
+  const [checking, setChecking] = useState(false);
+  const [upToDate, setUpToDate] = useState(false);
 
   useEffect(() => {
     check()
@@ -49,5 +54,26 @@ export function useUpdater(): UpdaterState & UpdaterActions {
 
   const dismiss = useCallback(() => setAvailable(false), []);
 
-  return { available, version, installing, error, install, dismiss };
+  const checkNow = useCallback(async () => {
+    if (checking) return;
+    setChecking(true);
+    setUpToDate(false);
+    try {
+      const u = await check();
+      if (u) {
+        setUpdate(u);
+        setAvailable(true);
+        setVersion(u.version);
+      } else {
+        setUpToDate(true);
+        setTimeout(() => setUpToDate(false), 3000);
+      }
+    } catch {
+      // Silent
+    } finally {
+      setChecking(false);
+    }
+  }, [checking]);
+
+  return { available, version, installing, error, checking, upToDate, install, dismiss, checkNow };
 }

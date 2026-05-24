@@ -220,6 +220,25 @@ kbd {
   margin: 0;
 }
 
+.settings__row--update {
+  justify-content: center;
+}
+
+.settings__check-btn {
+  font-family: var(--font-ui);
+  font-size: 11px;
+  color: var(--muted);
+  background: none;
+  border: none;
+  padding: 2px 4px;
+  cursor: pointer;
+  transition: color 0.2s;
+  line-height: 1;
+}
+.settings__check-btn:hover:not(:disabled) { color: var(--ink-soft); }
+.settings__check-btn:disabled { cursor: default; }
+.settings__check-btn.is-ok { color: var(--ink-soft); }
+
 /* -------------------------------------------------------------- Model picker */
 
 .model {

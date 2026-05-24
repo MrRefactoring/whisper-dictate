@@ -14,7 +14,14 @@ const LANG_OPTS: { value: Lang; label: string }[] = [
   { value: "ru", label: "ru" },
 ];
 
-export function SettingsMenu() {
+interface Props {
+  checking: boolean;
+  upToDate: boolean;
+  updateAvailable: boolean;
+  checkNow: () => Promise<void>;
+}
+
+export function SettingsMenu({ checking, upToDate, updateAvailable, checkNow }: Props) {
   const [open, setOpen] = useState(false);
   const { lang, setLang, t } = useI18n();
   const { theme, setTheme } = useTheme();
@@ -28,6 +35,12 @@ export function SettingsMenu() {
     document.addEventListener("mousedown", onDown);
     return () => document.removeEventListener("mousedown", onDown);
   }, [open]);
+
+  const updateLabel = checking
+    ? t.settings.checking
+    : upToDate
+      ? t.settings.upToDate
+      : t.settings.checkUpdates;
 
   return (
     <div ref={containerRef} className={`settings ${open ? "is-open" : ""}`}>
@@ -84,6 +97,22 @@ export function SettingsMenu() {
               ))}
             </div>
           </div>
+
+          {!updateAvailable && (
+            <>
+              <div className="settings__divider" aria-hidden="true" />
+              <div className="settings__row settings__row--update">
+                <button
+                  type="button"
+                  className={`settings__check-btn${upToDate ? " is-ok" : ""}`}
+                  onClick={checkNow}
+                  disabled={checking || upToDate}
+                >
+                  {updateLabel}
+                </button>
+              </div>
+            </>
+          )}
         </div>
       )}
     </div>
