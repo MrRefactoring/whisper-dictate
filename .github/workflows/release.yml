@@ -71,8 +71,10 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
-      # whisper.cpp Vulkan backend requires the Vulkan SDK (headers + glslc) at build time
-      - name: Install Vulkan SDK (Windows)
+      # whisper.cpp Vulkan backend requires the Vulkan SDK (headers + glslc) at build time.
+      # We also switch CMake to Ninja: MSBuild runs ExternalProject_Add steps in parallel
+      # and breaks the vulkan-shaders-gen configure stage; Ninja serialises them correctly.
+      - name: Install Vulkan SDK and configure Ninja (Windows)
         if: matrix.platform == 'windows-latest'
         shell: pwsh
         run: |
@@ -80,6 +82,12 @@ jobs:
           $sdk = Get-ChildItem "C:\VulkanSDK" | Sort-Object Name -Descending | Select-Object -First 1
           echo "VULKAN_SDK=$($sdk.FullName)" >> $env:GITHUB_ENV
           echo "$($sdk.FullName)\Bin" >> $env:GITHUB_PATH
+          echo "CMAKE_GENERATOR=Ninja" >> $env:GITHUB_ENV
+
+      # ilammy/msvc-dev-cmd puts cl.exe / link.exe in PATH so Ninja can find the MSVC toolchain
+      - name: Set up MSVC dev environment (Windows)
+        if: matrix.platform == 'windows-latest'
+        uses: ilammy/msvc-dev-cmd@v1
 
       - name: Build and upload to release
         uses: tauri-apps/tauri-action@v0
