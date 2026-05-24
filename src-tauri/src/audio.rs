@@ -14,56 +14,34 @@ pub const TARGET_SAMPLE_RATE: u32 = 16_000;
 
 pub type SharedBuffer = Arc<Mutex<Vec<f32>>>;
 
-/// Checks microphone TCC permission on macOS.
+/// Returns an error if the user has explicitly denied microphone access via TCC.
 ///
-/// - `NotDetermined (0)`: shows the system dialog and blocks until the user responds.
-/// - `Authorized (3)`: returns `Ok(())` immediately.
-/// - `Denied / Restricted`: returns an error with a human-readable message.
-///
-/// Must be called just before opening the audio stream (i.e. inside `start_capture`),
-/// so the app window is already visible when the dialog appears. Calling it earlier
-/// (e.g. at app startup before the window is shown) causes macOS to silently drop
-/// the request because there is no foreground window to anchor the dialog.
+/// For `NotDetermined` and `Authorized` we return `Ok(())` — cpal / CoreAudio
+/// will trigger the system dialog automatically when it opens the audio stream.
+/// That one-shot CoreAudio dialog is the correct, reliable path on macOS (it is
+/// what v0.1.0 used and it works).  Calling `AVCaptureDevice.requestAccess`
+/// ourselves *before* cpal opens the stream causes two separate TCC requests
+/// racing each other, which is why permission was being asked 6 times.
 #[cfg(target_os = "macos")]
-fn ensure_microphone_permission() -> Result<()> {
-    use block2::RcBlock;
+fn check_mic_not_denied() -> Result<()> {
     use objc2::msg_send;
     use objc2::runtime::AnyClass;
     use objc2_foundation::ns_string;
-    use std::sync::mpsc;
 
     unsafe {
         let Some(cls) = AnyClass::get(c"AVCaptureDevice") else {
-            return Ok(()); // AVFoundation unavailable — let cpal handle it
+            eprintln!("[audio] AVCaptureDevice not found, skipping TCC pre-check");
+            return Ok(());
         };
         let audio_type = ns_string!("soun"); // AVMediaTypeAudio
-
         // AVAuthorizationStatus: 0=NotDetermined, 1=Restricted, 2=Denied, 3=Authorized
         let status: isize = msg_send![cls, authorizationStatusForMediaType: audio_type];
-
+        eprintln!("[audio] TCC mic status = {status} (0=unknown,1=restricted,2=denied,3=ok)");
         match status {
-            3 => Ok(()), // already authorized
-            0 => {
-                // First time: show the system dialog and block until user responds.
-                let (tx, rx) = mpsc::channel::<bool>();
-                let block: RcBlock<dyn Fn(objc2::runtime::Bool)> =
-                    RcBlock::new(move |granted: objc2::runtime::Bool| {
-                        let _ = tx.send(granted.as_bool());
-                    });
-                let _: () = msg_send![
-                    cls,
-                    requestAccessForMediaType: audio_type,
-                    completionHandler: &*block
-                ];
-                if rx.recv().unwrap_or(false) {
-                    Ok(())
-                } else {
-                    Err(anyhow!("microphone access denied"))
-                }
-            }
-            _ => Err(anyhow!(
-                "microphone access denied — enable it in System Settings → Privacy & Security → Microphone"
+            1 | 2 => Err(anyhow!(
+                "microphone access denied — open System Settings → Privacy & Security → Microphone"
             )),
+            _ => Ok(()),
         }
     }
 }
@@ -76,19 +54,24 @@ pub struct AudioCapture {
 }
 
 pub fn start_capture(buffer: SharedBuffer) -> Result<AudioCapture> {
-    // On macOS, verify (and if needed request) TCC permission before touching CoreAudio.
-    // Doing this here — rather than at app startup — ensures the app window is already
-    // visible, which is required for the system dialog to appear.
+    eprintln!("[audio] start_capture called");
+
+    // On macOS: bail early if permission was explicitly denied so the user gets
+    // a human-readable error instead of a cryptic CoreAudio code.
+    // For NotDetermined/Authorized we fall through and let cpal open the stream —
+    // CoreAudio shows the one-time TCC dialog automatically when needed.
     #[cfg(target_os = "macos")]
-    ensure_microphone_permission()?;
+    check_mic_not_denied()?;
 
     let host = cpal::default_host();
     let device = host
         .default_input_device()
         .ok_or_else(|| anyhow!("no default input device found"))?;
 
+    eprintln!("[audio] input device: {}", device.name().unwrap_or_default());
+
     let supported = device.default_input_config()?;
-    // In cpal 0.17, `SampleRate` is a type alias for `u32` (no `.0` needed).
+    eprintln!("[audio] config: {:?}", supported);
     let sample_rate = supported.sample_rate();
     let channels = supported.channels() as usize;
     let config: cpal::StreamConfig = supported.config();
@@ -102,7 +85,9 @@ pub fn start_capture(buffer: SharedBuffer) -> Result<AudioCapture> {
         other => return Err(anyhow!("unsupported sample format: {other:?}")),
     };
 
+    eprintln!("[audio] stream built, calling play()");
     stream.play()?;
+    eprintln!("[audio] stream playing");
     Ok(AudioCapture {
         _stream: stream,
         sample_rate,

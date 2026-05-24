@@ -123,15 +123,23 @@ fn worker(
 
         match rx.recv_timeout(timeout) {
             Ok(EngineCommand::Start) => {
-                buffer.lock().clear();
-                match audio::start_capture(buffer.clone()) {
-                    Ok(c) => {
-                        capture = Some(c);
-                        recording = true;
-                        last_interim = Instant::now();
-                        emit_state(&app, RecordingState::Recording);
+                if recording {
+                    eprintln!("[engine] Start received while already recording — ignored");
+                } else {
+                    eprintln!("[engine] Start");
+                    buffer.lock().clear();
+                    match audio::start_capture(buffer.clone()) {
+                        Ok(c) => {
+                            capture = Some(c);
+                            recording = true;
+                            last_interim = Instant::now();
+                            emit_state(&app, RecordingState::Recording);
+                        }
+                        Err(e) => {
+                            eprintln!("[engine] start_capture error: {e}");
+                            emit_error(&app, format!("microphone: {e}"));
+                        }
                     }
-                    Err(e) => emit_error(&app, format!("microphone: {e}")),
                 }
             }
             Ok(EngineCommand::SetLocked(locked)) => {
