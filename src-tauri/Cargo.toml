@@ -1,6 +1,6 @@
 [package]
 name = "whisper-dictate"
-version = "0.2.4"
+version = "0.2.5"
 description = "Local speech-to-text via Whisper (Metal on macOS, CPU on Windows)"
 authors = ["Vladislav Tupikin"]
 edition = "2021"
