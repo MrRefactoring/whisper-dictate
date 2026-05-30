@@ -27,7 +27,7 @@ fn main() {
             .expect("load failed");
 
         eprintln!("[worker] transcribing…");
-        t.transcribe_with(&pcm, |p| eprintln!("[worker] progress {p}%"), || false)
+        t.transcribe_chunked(&pcm, || false)
             .expect("transcribe failed")
     });
 

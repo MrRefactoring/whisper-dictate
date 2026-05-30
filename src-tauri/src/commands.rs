@@ -63,7 +63,16 @@ pub fn get_model_status(status: State<ModelStatusShared>) -> ModelStatusValue {
 #[tauri::command]
 pub fn download_model(app: AppHandle, flags: State<DownloadFlags>, model: ModelId) {
     let cancel = Arc::new(AtomicBool::new(false));
-    flags.0.lock().unwrap().insert(model, cancel.clone());
+    {
+        // Guard against a double-click spawning two writers to the same `.part`
+        // file (File::create truncates → races/corruption). If a download for
+        // this model is already in flight, ignore the request.
+        let mut map = flags.0.lock().unwrap();
+        if map.contains_key(&model) {
+            return;
+        }
+        map.insert(model, cancel.clone());
+    }
     let map = flags.0.clone();
     std::thread::spawn(move || {
         let result = model_manager::download_model(&app, model, &cancel, |received, total| {

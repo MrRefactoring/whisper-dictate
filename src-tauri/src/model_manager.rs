@@ -180,6 +180,21 @@ where
     }
     file.flush().ok();
     drop(file);
+
+    // Guard against silent truncation: a connection dropped mid-stream looks like
+    // a clean EOF (read returns 0) when there is no chunked framing, so without
+    // this check a partial file would be renamed and later fail to load with a
+    // cryptic ggml error. If the server advertised a length, it must match.
+    if let Some(expected) = total {
+        if received != expected {
+            let _ = std::fs::remove_file(&part);
+            return Err(anyhow!(
+                "incomplete download: received {received} of {expected} bytes \
+                 (connection interrupted) — please retry"
+            ));
+        }
+    }
+
     std::fs::rename(&part, &dest).context("failed to rename .part to final file")?;
     on_progress(received, total.or(Some(received)));
     Ok(DownloadOutcome::Completed)

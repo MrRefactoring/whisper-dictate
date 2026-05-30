@@ -75,14 +75,16 @@ impl Transcriber {
         collect_segments(&state)
     }
 
-    /// Transcribes a long buffer (file) by splitting into 30 s windows.
+    /// Transcribes an arbitrarily long buffer by splitting into 30 s windows.
     ///
     /// On macOS, `state.full()` on >30 s audio makes multiple Metal encode calls in a
     /// row; the second one fails due to contention with WKWebView. Chunking avoids
-    /// this: each call gets ≤30 s → exactly one Metal encode → stable.
+    /// this: each call gets ≤30 s → exactly one Metal encode → stable. This is why
+    /// BOTH live finalize and file transcription must go through here, never a bare
+    /// `transcribe()` on a long buffer.
     /// On Windows/Linux, chunking also enables cancellation checks and smooth
     /// progress animation on the JS side.
-    pub fn transcribe_file<A>(
+    pub fn transcribe_chunked<A>(
         &self,
         samples_16k: &[f32],
         should_abort: A,
@@ -116,8 +118,11 @@ impl Transcriber {
 
 fn base_params() -> FullParams<'static, 'static> {
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
+    // Cap threads: most work runs on the GPU, and on Apple Silicon spilling onto
+    // efficiency cores hurts more than it helps. 8 is plenty for the CPU-side
+    // pre/post-processing without oversubscribing.
     let threads = std::thread::available_parallelism()
-        .map(|n| n.get() as i32)
+        .map(|n| n.get().min(8) as i32)
         .unwrap_or(4);
     params.set_n_threads(threads);
     params.set_language(Some("auto"));
