@@ -156,7 +156,7 @@ where
     let mut file = std::fs::File::create(&part)
         .with_context(|| format!("failed to create file: {}", part.display()))?;
 
-    let mut buf = [0u8; 1 << 16]; // 64 KiB
+    let mut buf = [0u8; 1 << 16];
     let mut received: u64 = 0;
     let mut last_report: u64 = 0;
     on_progress(0, total);
@@ -172,7 +172,6 @@ where
         }
         file.write_all(&buf[..n]).context("error writing model file")?;
         received += n as u64;
-        // Throttle progress events: at most once per ~2 MB.
         if received - last_report >= 2_000_000 {
             on_progress(received, total);
             last_report = received;
@@ -181,10 +180,6 @@ where
     file.flush().ok();
     drop(file);
 
-    // Guard against silent truncation: a connection dropped mid-stream looks like
-    // a clean EOF (read returns 0) when there is no chunked framing, so without
-    // this check a partial file would be renamed and later fail to load with a
-    // cryptic ggml error. If the server advertised a length, it must match.
     if let Some(expected) = total {
         if received != expected {
             let _ = std::fs::remove_file(&part);

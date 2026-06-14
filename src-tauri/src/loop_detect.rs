@@ -8,11 +8,11 @@
 //! speech due to the high threshold.
 
 const SAMPLE_RATE: usize = 16_000;
-const MIN_LOOP_SECS: usize = 10; // search for repetition no earlier than 10 s
-const WINDOW_SECS: usize = 5;    // comparison window 5 s
-const SUB_WIN: usize = 500;      // fingerprint sub-window, 500 samples (~31 ms)
-const STEP: usize = 4_000;       // search step, 0.25 s
-const THRESHOLD: f32 = 0.92;     // 0.97 missed reels with compression artifacts
+const MIN_LOOP_SECS: usize = 10;
+const WINDOW_SECS: usize = 5;
+const SUB_WIN: usize = 500;
+const STEP: usize = 4_000;
+const THRESHOLD: f32 = 0.92;
 
 /// Find the start of a looped segment (in 16 kHz samples).
 /// Returns `None` if no loop is detected or the audio is too short.

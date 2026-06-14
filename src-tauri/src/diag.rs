@@ -61,14 +61,11 @@ pub fn redirect_native_stderr() {
         return;
     };
 
-    // SAFETY: dup2 of a valid open fd onto STDERR_FILENO; standard redirect.
     unsafe {
         libc::dup2(file.as_raw_fd(), libc::STDERR_FILENO);
     }
-    // Keep the fd open for the whole process lifetime.
     std::mem::forget(file);
 
-    // Ensure Rust panics are flushed to the (now redirected) stderr.
     let default = std::panic::take_hook();
     std::panic::set_hook(Box::new(move |info| {
         eprintln!("=== RUST PANIC: {info}");
@@ -169,7 +166,6 @@ fn quarantine_hint(exe: &str) -> String {
 fn codesign_hint(exe: &str) -> String {
     #[cfg(target_os = "macos")]
     {
-        // codesign writes its details to stderr.
         let out = std::process::Command::new("codesign")
             .args(["-dv", exe])
             .output();
@@ -186,7 +182,7 @@ fn codesign_hint(exe: &str) -> String {
                     .map(|l| l.trim().to_string());
                 match (authority, signature) {
                     (Some(a), _) => a,
-                    (None, Some(s)) => s, // e.g. "Signature=adhoc"
+                    (None, Some(s)) => s,
                     (None, None) if o.status.success() => "signed (no authority line)".into(),
                     _ => "unsigned or not a bundle".into(),
                 }

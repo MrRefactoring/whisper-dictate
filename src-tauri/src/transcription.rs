@@ -92,7 +92,7 @@ impl Transcriber {
     where
         A: Fn() -> bool,
     {
-        const WINDOW: usize = 30 * 16_000; // 30 s — one Metal/Vulkan encode call
+        const WINDOW: usize = 30 * 16_000;
         let total = samples_16k.len();
         let mut parts: Vec<String> = Vec::new();
         let mut start = 0;
@@ -118,9 +118,6 @@ impl Transcriber {
 
 fn base_params() -> FullParams<'static, 'static> {
     let mut params = FullParams::new(SamplingStrategy::Greedy { best_of: 1 });
-    // Cap threads: most work runs on the GPU, and on Apple Silicon spilling onto
-    // efficiency cores hurts more than it helps. 8 is plenty for the CPU-side
-    // pre/post-processing without oversubscribing.
     let threads = std::thread::available_parallelism()
         .map(|n| n.get().min(8) as i32)
         .unwrap_or(4);

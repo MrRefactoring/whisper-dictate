@@ -74,6 +74,5 @@ export interface FileError {
 
 export interface FileTask {
   name: string;
-  /** Transcription progress 0..100 (0 = decoding in progress). */
   pct: number;
 }

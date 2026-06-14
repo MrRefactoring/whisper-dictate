@@ -64,9 +64,6 @@ pub fn get_model_status(status: State<ModelStatusShared>) -> ModelStatusValue {
 pub fn download_model(app: AppHandle, flags: State<DownloadFlags>, model: ModelId) {
     let cancel = Arc::new(AtomicBool::new(false));
     {
-        // Guard against a double-click spawning two writers to the same `.part`
-        // file (File::create truncates → races/corruption). If a download for
-        // this model is already in flight, ignore the request.
         let mut map = flags.0.lock().unwrap();
         if map.contains_key(&model) {
             return;

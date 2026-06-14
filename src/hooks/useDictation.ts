@@ -5,8 +5,6 @@ import { writeText } from "@tauri-apps/plugin-clipboard-manager";
 import { info as logInfo, attachConsole } from "@tauri-apps/plugin-log";
 import { useI18n } from "../i18n";
 
-// Monotonic counter for recording-control invocations — lets the log reveal
-// duplicate/suppressed start_recording calls while diagnosing the mic bug.
 let invokeSeq = 0;
 const feLog = (msg: string) => {
   logInfo(`[fe] #${++invokeSeq} ${msg}`).catch(() => {});
@@ -82,7 +80,6 @@ export function useDictation(): DictationState & DictationActions {
     let detachConsole: UnlistenFn | undefined;
     let cancelled = false;
 
-    // Mirror webview console.* into the same log file as the Rust backend.
     attachConsole()
       .then((d) => {
         if (cancelled) d();
@@ -141,10 +138,8 @@ export function useDictation(): DictationState & DictationActions {
           setFileTask({ name: e.payload.name, pct: 0 }),
         ),
         listen<FileDuration>(EVENTS.fileDuration, (e) => {
-          // τ calibrated so the bar reaches ~90% at the estimated completion time.
-          // Estimated time = audio duration / 3 (≈3× realtime on M1 Pro Metal).
           const estimated = Math.max(10, e.payload.duration_secs / 3);
-          const tau = (estimated / Math.log(19)) * 1000; // ms; log(19)≈2.944
+          const tau = (estimated / Math.log(19)) * 1000;
           fileAnimStartRef.current = Date.now();
           fileAnimTauRef.current = tau;
           if (fileAnimRef.current !== null) clearInterval(fileAnimRef.current);
@@ -177,8 +172,6 @@ export function useDictation(): DictationState & DictationActions {
     })();
 
     refreshModels();
-    // Query current model status on mount — the model-status event may have
-    // fired before our subscription was set up (especially if the model was cached).
     invoke<ModelStatus>("get_model_status")
       .then((s) => setModelStatus(s))
       .catch(() => {});

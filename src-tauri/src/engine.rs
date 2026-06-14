@@ -31,7 +31,7 @@ use tauri::{AppHandle, Emitter};
 /// How often to run interim transcription during recording.
 const INTERIM_INTERVAL: Duration = Duration::from_millis(900);
 /// Minimum buffer length (in 16 kHz samples) to run whisper.
-const MIN_SAMPLES_16K: usize = 8_000; // 0.5 s
+const MIN_SAMPLES_16K: usize = 8_000;
 /// Live preview transcribes only the most recent N seconds of audio. This bounds
 /// per-tick work to a single Metal/Vulkan encode (≤30 s) regardless of how long
 /// the recording has run, so cost stays O(1) per tick instead of re-transcribing
@@ -120,7 +120,6 @@ fn worker(
     }
 
     loop {
-        // Poll quickly during recording (interim + level), sleep until command otherwise.
         let timeout = if recording {
             Duration::from_millis(200)
         } else {
@@ -144,9 +143,6 @@ fn worker(
                         Err(e) => {
                             log::error!(target: "engine", "start_capture error: {e}");
                             emit_error(&app, format!("microphone: {e}"));
-                            // Re-assert Idle so the frontend clears its optimistic
-                            // "active" guard; otherwise recording stays wedged and
-                            // every subsequent start is suppressed until restart.
                             emit_state(&app, RecordingState::Idle);
                         }
                     }
@@ -166,7 +162,7 @@ fn worker(
             }
             Ok(EngineCommand::Stop) => {
                 let rate = capture.as_ref().map(|c| c.sample_rate).unwrap_or(16_000);
-                capture = None; // drop stops the stream
+                capture = None;
                 recording = false;
                 emit_state(&app, RecordingState::Finalizing);
                 finalize(&app, transcriber.as_ref(), &buffer, rate);
@@ -221,12 +217,9 @@ fn tick(
     rate: u32,
     last_interim: &mut Instant,
 ) {
-    let rms_window = (rate as usize / 10).max(1); // ~100 ms
+    let rms_window = (rate as usize / 10).max(1);
     let interim_due = transcriber.is_some() && last_interim.elapsed() >= INTERIM_INTERVAL;
 
-    // Hold the lock only long enough to copy the tail we actually need: the
-    // interim window when due, otherwise just the RMS window. Never clone the
-    // whole (potentially tens-of-MB) buffer.
     let tail = {
         let buf = buffer.lock();
         let want = if interim_due {
@@ -238,14 +231,11 @@ fn tick(
         buf[start..].to_vec()
     };
 
-    // Mic level from the last ~100 ms window, for the visual indicator.
     let rms_start = tail.len().saturating_sub(rms_window);
     let _ = app.emit("audio-level", vad::rms(&tail[rms_start..]));
 
     if interim_due {
         if let Some(t) = transcriber {
-            // Window is ≤ INTERIM_WINDOW_SECS (< 30 s) → exactly one encode, so a
-            // bare `transcribe()` is safe here (no chunking needed).
             let pcm = audio::resample_to_16k(&tail, rate);
             if pcm.len() >= MIN_SAMPLES_16K {
                 if let Ok(text) = t.transcribe(&pcm) {
@@ -271,7 +261,6 @@ fn finalize(app: &AppHandle, transcriber: Option<&Transcriber>, buffer: &SharedB
         let _ = app.emit("transcription-final", String::new());
         return;
     }
-    // Chunked: a dictation longer than 30 s would otherwise fail on macOS Metal.
     match t.transcribe_chunked(&pcm, || false) {
         Ok(text) => {
             let _ = app.emit("transcription-final", text);
@@ -320,7 +309,6 @@ fn transcribe_file(
         return;
     }
 
-    // Trim at the loop point if one was detected.
     if let Some(loop_pt) = loop_detect::find_loop_point(&pcm) {
         log::info!(target: "engine", "loop at {:.1} s, trimming", loop_pt as f32 / 16_000.0);
         pcm.truncate(loop_pt);

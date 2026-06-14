@@ -35,9 +35,7 @@ export function useUpdater(): UpdaterState & UpdaterActions {
           setVersion(u.version);
         }
       })
-      .catch(() => {
-        // Silent: no network or endpoint not configured — expected in dev.
-      });
+      .catch(() => {});
   }, []);
 
   const install = useCallback(async () => {
@@ -69,7 +67,6 @@ export function useUpdater(): UpdaterState & UpdaterActions {
         setTimeout(() => setUpToDate(false), 3000);
       }
     } catch {
-      // Silent
     } finally {
       setChecking(false);
     }
