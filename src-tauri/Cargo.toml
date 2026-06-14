@@ -36,6 +36,9 @@ tauri-plugin-process = "2"
 tauri-plugin-log = "2"
 log = "0.4"
 symphonia = { version = "0.5", features = ["all"] }
+# Opus decoder (libopus via FFI; audiopus_sys builds it statically from source).
+# Symphonia demuxes ogg/opus but has no Opus decoder, so we decode those packets here.
+opus = "0.3"
 
 # Unix-only: dup2 fd redirect to capture native (C++/ggml) stderr into a log file
 [target.'cfg(unix)'.dependencies]
