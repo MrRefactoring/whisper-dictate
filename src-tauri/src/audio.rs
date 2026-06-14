@@ -112,19 +112,24 @@ fn ensure_mic_authorized() -> Result<()> {
     }
 }
 
+/// Human-readable device name via cpal's `description()` (the non-deprecated API).
+fn device_name(device: &cpal::Device) -> Option<String> {
+    device.description().ok().map(|d| d.name().to_string())
+}
+
 /// Enumerates available input devices with their default config, for diagnostics.
 pub fn enumerate_input_devices() -> Vec<String> {
     let host = cpal::default_host();
     let default_name = host
         .default_input_device()
-        .and_then(|d| d.name().ok())
+        .and_then(|d| device_name(&d))
         .unwrap_or_default();
 
     let mut out = Vec::new();
     match host.input_devices() {
         Ok(devices) => {
             for d in devices {
-                let name = d.name().unwrap_or_else(|_| "<unknown>".into());
+                let name = device_name(&d).unwrap_or_else(|| "<unknown>".into());
                 let cfg = d
                     .default_input_config()
                     .map(|c| format!("{c:?}"))
@@ -159,7 +164,7 @@ pub fn start_capture(buffer: SharedBuffer) -> Result<AudioCapture> {
         .default_input_device()
         .ok_or_else(|| anyhow!("no default input device found"))?;
 
-    log::info!(target: "audio", "input device: {}", device.name().unwrap_or_default());
+    log::info!(target: "audio", "input device: {}", device_name(&device).unwrap_or_default());
 
     let supported = device.default_input_config()?;
     log::info!(target: "audio", "config: {supported:?}");
