@@ -77,6 +77,10 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
+          # audiopus_sys vendors a libopus whose CMakeLists declares a
+          # cmake_minimum_required < 3.5; CMake 4.x (on the runners) refuses it
+          # without this compatibility floor.
+          CMAKE_POLICY_VERSION_MINIMUM: '3.5'
         with:
           releaseId: ${{ needs.create-release.outputs.release-id }}
           tauriScript: pnpm tauri
