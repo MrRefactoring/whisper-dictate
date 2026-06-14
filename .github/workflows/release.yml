@@ -81,6 +81,7 @@ jobs:
         env:
           APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
           APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
           KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
         run: |
           KC="$RUNNER_TEMP/build.keychain"
@@ -96,8 +97,10 @@ jobs:
           # set-key-partition-list dumps the key and can exit non-zero even when it
           # succeeds; ignore its output/exit so `set -e` doesn't kill the step.
           security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KC" >/dev/null 2>&1 || true
-          # Self-signed cert is untrusted by default; mark it as a trusted code-signing root.
-          openssl pkcs12 -in "$P12" -clcerts -nokeys -legacy -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -out "$PEM"
+          # Self-signed cert is untrusted by default; mark it as a trusted code-signing
+          # root. Export the public cert from the keychain via `security` (avoids
+          # openssl, whose -legacy flag LibreSSL on the runner does not support).
+          security find-certificate -c "$APPLE_SIGNING_IDENTITY" -p "$KC" > "$PEM"
           sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$PEM"
           # Diagnostic only — should now list "Whisper Dictate" as a valid identity.
           security find-identity -v -p codesigning "$KC" || true
