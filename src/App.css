@@ -234,6 +234,11 @@ kbd {
   cursor: pointer;
   transition: color 0.2s;
   line-height: 1;
+  /* Fixed footprint so the label swap (check → checking → up to date)
+     keeps one line and a stable width — no vertical/horizontal jump. */
+  min-width: 140px;
+  text-align: center;
+  white-space: nowrap;
 }
 .settings__check-btn:hover:not(:disabled) { color: var(--ink-soft); }
 .settings__check-btn:disabled { cursor: default; }
@@ -788,7 +793,14 @@ kbd {
   z-index: 90;
 }
 .update-banner__text { color: var(--ink-soft); }
-.update-banner__btn { font-size: 12px; }
+.update-banner__btn {
+  font-size: 12px;
+  /* Stable width so the install → installing label swap doesn't resize the
+     button (and shift the centered banner). */
+  min-width: 84px;
+  text-align: center;
+  white-space: nowrap;
+}
 .update-banner__dismiss { color: var(--muted); font-size: 11px; padding: 0; }
 
 @media (prefers-reduced-motion: reduce) {
