@@ -34,7 +34,8 @@
     "shortDescription": "Local speech-to-text via Whisper",
     "longDescription": "Whisper Dictate — fully local speech recognition via Whisper, no audio leaves the device. Transcript can be edited and copied.",
     "macOS": {
-      "minimumSystemVersion": "11.0"
+      "minimumSystemVersion": "11.0",
+      "entitlements": "Entitlements.plist"
     },
     "windows": {
       "digestAlgorithm": "sha256",
