@@ -71,20 +71,45 @@ jobs:
         with:
           workspaces: ./src-tauri -> target
 
+      # Import the self-signed signing cert and TRUST it for code signing, so Tauri
+      # can resolve it as a valid identity. tauri-action's built-in import does not
+      # trust the cert, and Tauri rejects untrusted identities ("failed to resolve
+      # signing identity"). We therefore set up the keychain ourselves here and only
+      # hand APPLE_SIGNING_IDENTITY to tauri-action below.
+      - name: Import & trust signing certificate (macOS)
+        if: matrix.platform == 'macos-latest'
+        env:
+          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
+          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
+        run: |
+          KC="$RUNNER_TEMP/build.keychain"
+          P12="$RUNNER_TEMP/cert.p12"
+          PEM="$RUNNER_TEMP/cert.pem"
+          echo "$APPLE_CERTIFICATE" | base64 --decode > "$P12"
+          security create-keychain -p "$KEYCHAIN_PASSWORD" "$KC"
+          security default-keychain -s "$KC"
+          security list-keychains -d user -s "$KC" $(security list-keychains -d user | sed 's/"//g')
+          security unlock-keychain -p "$KEYCHAIN_PASSWORD" "$KC"
+          security set-keychain-settings -t 3600 -u "$KC"
+          security import "$P12" -k "$KC" -P "$APPLE_CERTIFICATE_PASSWORD" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple:,codesign: -s -k "$KEYCHAIN_PASSWORD" "$KC"
+          # Self-signed cert is untrusted by default; mark it as a trusted code-signing root.
+          openssl pkcs12 -in "$P12" -clcerts -nokeys -legacy -passin pass:"$APPLE_CERTIFICATE_PASSWORD" -out "$PEM"
+          sudo security add-trusted-cert -d -r trustRoot -p codeSign -k /Library/Keychains/System.keychain "$PEM"
+          security find-identity -v -p codesigning "$KC"
+          rm -f "$P12" "$PEM"
+
       - name: Build and upload to release
         uses: tauri-apps/tauri-action@v0
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           TAURI_SIGNING_PRIVATE_KEY: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY }}
           TAURI_SIGNING_PRIVATE_KEY_PASSWORD: ${{ secrets.TAURI_SIGNING_PRIVATE_KEY_PASSWORD }}
-          # macOS code signing with a self-signed cert: gives the bundle a stable
-          # identity so TCC keeps the microphone grant across updates. Not
-          # notarized (no Apple Developer account), so Gatekeeper still warns once.
-          # Ignored on the Windows runner.
-          APPLE_CERTIFICATE: ${{ secrets.APPLE_CERTIFICATE }}
-          APPLE_CERTIFICATE_PASSWORD: ${{ secrets.APPLE_CERTIFICATE_PASSWORD }}
+          # Self-signed identity imported & trusted in the previous step (macOS only;
+          # empty/ignored on Windows). Gives the bundle a stable identity so TCC keeps
+          # the mic grant across updates. Not notarized — Gatekeeper still warns once.
           APPLE_SIGNING_IDENTITY: ${{ secrets.APPLE_SIGNING_IDENTITY }}
-          KEYCHAIN_PASSWORD: ${{ secrets.KEYCHAIN_PASSWORD }}
           # audiopus_sys vendors a libopus whose CMakeLists declares a
           # cmake_minimum_required < 3.5; CMake 4.x (on the runners) refuses it
           # without this compatibility floor.
