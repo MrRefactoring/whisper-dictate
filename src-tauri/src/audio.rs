@@ -28,28 +28,87 @@ pub(crate) fn mic_tcc_status() -> isize {
             log::warn!(target: "audio", "AVCaptureDevice not found, assuming authorized");
             return 3;
         };
-        let audio_type = ns_string!("soun"); // AVMediaTypeAudio
+        let audio_type = ns_string!("soun");
         msg_send![cls, authorizationStatusForMediaType: audio_type]
     }
 }
 
-/// Returns an error if the user has explicitly denied microphone access via TCC.
+/// Synchronously requests microphone access and blocks until the user answers
+/// the system dialog. Returns whether access was granted.
 ///
-/// For `NotDetermined` and `Authorized` we return `Ok(())` — cpal / CoreAudio
-/// will trigger the system dialog automatically when it opens the audio stream.
-/// That one-shot CoreAudio dialog is the correct, reliable path on macOS (it is
-/// what v0.1.0 used and it works).  Calling `AVCaptureDevice.requestAccess`
-/// ourselves *before* cpal opens the stream causes two separate TCC requests
-/// racing each other, which is why permission was being asked 6 times.
+/// Only called when the status is `NotDetermined`. We wait for the completion
+/// handler (delivered on an AVFoundation queue) via a channel so that, by the
+/// time cpal opens the stream, the status is already resolved — CoreAudio then
+/// does *not* show its own dialog, so the user sees exactly one prompt. The
+/// earlier "asked 6 times" bug came from firing `requestAccess` *without*
+/// awaiting it, racing cpal's implicit dialog.
+///
+/// Blocking here is safe: `start_capture` runs on the engine worker thread, not
+/// the main thread, so the main runloop stays free to present the modal dialog.
 #[cfg(target_os = "macos")]
-fn check_mic_not_denied() -> Result<()> {
+fn request_mic_access_blocking() -> bool {
+    use block2::RcBlock;
+    use objc2::msg_send;
+    use objc2::runtime::{AnyClass, Bool};
+    use objc2_foundation::ns_string;
+
+    let Some(cls) = AnyClass::get(c"AVCaptureDevice") else {
+        log::warn!(target: "audio", "AVCaptureDevice not found, assuming authorized");
+        return true;
+    };
+
+    let (tx, rx) = crossbeam_channel::bounded::<bool>(1);
+    // The handler runs on an arbitrary AVFoundation queue, so it must be
+    // `Send + 'static`; it captures only the channel sender.
+    let handler = RcBlock::new(move |granted: Bool| {
+        let _ = tx.send(granted.as_bool());
+    });
+
+    let audio_type = ns_string!("soun");
+    unsafe {
+        let _: () = msg_send![
+            cls,
+            requestAccessForMediaType: audio_type,
+            completionHandler: &*handler,
+        ];
+    }
+
+    // Hold `handler` alive until the answer arrives, then return it.
+    match rx.recv() {
+        Ok(granted) => granted,
+        Err(_) => false,
+    }
+}
+
+/// Ensures the app may use the microphone, requesting access on first use.
+///
+/// `Authorized` proceeds immediately; `Denied`/`Restricted` errors out;
+/// `NotDetermined` triggers a single blocking system prompt (see
+/// [`request_mic_access_blocking`]).
+#[cfg(target_os = "macos")]
+fn ensure_mic_authorized() -> Result<()> {
     let status = mic_tcc_status();
-    log::info!(target: "audio", "TCC mic status = {status} (0=unknown,1=restricted,2=denied,3=ok)");
+    log::info!(target: "audio", "TCC mic status = {status} (0=notdetermined,1=restricted,2=denied,3=authorized)");
+    let denied = || {
+        anyhow!("microphone access denied — open System Settings → Privacy & Security → Microphone")
+    };
     match status {
-        1 | 2 => Err(anyhow!(
-            "microphone access denied — open System Settings → Privacy & Security → Microphone"
-        )),
-        _ => Ok(()),
+        3 => Ok(()),
+        1 | 2 => Err(denied()),
+        0 => {
+            log::info!(target: "audio", "requesting microphone access (blocking)");
+            if request_mic_access_blocking() {
+                log::info!(target: "audio", "microphone access granted");
+                Ok(())
+            } else {
+                log::warn!(target: "audio", "microphone access denied by user");
+                Err(denied())
+            }
+        }
+        other => {
+            log::warn!(target: "audio", "unexpected TCC status {other}, proceeding");
+            Ok(())
+        }
     }
 }
 
@@ -92,12 +151,8 @@ pub struct AudioCapture {
 pub fn start_capture(buffer: SharedBuffer) -> Result<AudioCapture> {
     log::info!(target: "audio", "start_capture called");
 
-    // On macOS: bail early if permission was explicitly denied so the user gets
-    // a human-readable error instead of a cryptic CoreAudio code.
-    // For NotDetermined/Authorized we fall through and let cpal open the stream —
-    // CoreAudio shows the one-time TCC dialog automatically when needed.
     #[cfg(target_os = "macos")]
-    check_mic_not_denied()?;
+    ensure_mic_authorized()?;
 
     let host = cpal::default_host();
     let device = host
